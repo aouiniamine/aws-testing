@@ -1,0 +1,21 @@
+services:
+  floci:
+    image: floci/floci:1.7.0
+    ports:
+      - "4566:4566"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    environment:
+      FLOCI_STORAGE_MODE: hybrid
+  floci-ui:
+    image: floci/floci-ui:latest
+    ports:
+      - "4500:4500" # Frontend Web UI
+      - "4501:4501"
+    environment:
+      # Tells the UI proxy to use the internal Docker network hostname
+      - FLOCI_ENDPOINT=http://floci:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
