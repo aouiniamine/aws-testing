@@ -25,3 +25,16 @@ module "compute" {
   dynamodb_table_name = module.storage.table_name
   dynamodb_table_arn  = module.storage.table_arn
 }
+
+module "api" {
+  source                 = "./modules/api"
+  environment            = var.environment
+  producer_arn           = module.compute.producer_arn
+  producer_invoke_arn    = module.compute.producer_invoke_arn
+  producer_function_name = module.compute.producer_function_name
+}
+
+output "api_url" {
+  value       = module.api.api_endpoint
+  description = "Clean Architecture HTTP Ingress Endpoint"
+}
