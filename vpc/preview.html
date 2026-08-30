@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VPC Architecture — floci</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --public: #3b82f6;
+    --private: #10b981;
+    --vpc: #f59e0b;
+    --net: #8b5cf6;
+    --line: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  svg { width: 100%; height: auto; display: block; }
+  .box {
+    fill: #fff;
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .box.public { stroke: var(--public); }
+  .box.private { stroke: var(--private); }
+  .box.vpc { stroke: var(--vpc); }
+  .box.igw, .box.nat { stroke: var(--net); }
+  .lbl { font-size: 12px; fill: var(--ink); font-weight: 600; }
+  .lbl.sub { fill: var(--muted); font-weight: 400; font-size: 10.5px; }
+  .cidr { fill: var(--muted); font-size: 10.5px; font-family: ui-monospace, monospace; }
+  .route { stroke: var(--line); stroke-width: 2; stroke-dasharray: 5 4; fill: none; }
+  .flow { fill: none; stroke: #cbd5e1; stroke-width: 1.5; }
+  .rt-tag { font-size: 10px; font-weight: 700; letter-spacing: .5px; }
+  .rt-tag.public { fill: var(--public); }
+  .rt-tag.private { fill: var(--private); }
+  .arrow { fill: var(--line); }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+  <h1>AWS VPC Architecture</h1>
+  <div class="sub">Local floci deployment · CIDR 10.10.0.0/16 · us-east-1 · terraform</div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--public)"></span> Public</span>
+    <span><span class="dot" style="background:var(--private)"></span> Private</span>
+    <span><span class="dot" style="background:var(--net)"></span> Gateway</span>
+    <span><span class="dot" style="background:var(--vpc)"></span> VPC</span>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg">
+
+      <!-- Internet -->
+      <text class="lbl" x="420" y="34" fill="#334155" font-size="13">Internet</text>
+      <rect class="box igw" x="180" y="52" width="640" height="64" />
+      <text class="lbl" x="500" y="80" text-anchor="middle">Internet Gateway</text>
+      <text class="lbl sub" x="500" y="98" text-anchor="middle">aws_internet_gateway .main</text>
+
+      <line class="flow" x1="500" y1="52" x2="500" y2="30" />
+      <polygon class="arrow" points="496,30 500,20 504,30" />
+
+      <!-- VPC boundary -->
+      <rect class="box vpc" x="70" y="130" width="860" height="560" fill="#fffbeb" />
+      <text class="lbl" x="90" y="156" fill="#b45309">VPC</text>
+      <text class="lbl sub" x="90" y="172" fill="#b45309">10.10.0.0/16 · aws_vpc.main</text>
+
+      <!-- NAT column -->
+      <text class="lbl" x="170" y="205" fill="#3730a3">NAT</text>
+      <line class="route" x1="500" y1="200" x2="300" y2="200" />
+      <text class="lbl sub" x="368" y="195" text-anchor="middle">EIP</text>
+      <line class="flow" x1="300" y1="216" x2="300" y2="206" />
+      <polygon class="arrow" points="294,216 300,206 306,216" />
+      <rect class="box nat" x="180" y="216" width="240" height="62" />
+      <text class="lbl" x="300" y="242" text-anchor="middle">NAT Gateway</text>
+      <text class="lbl sub" x="300" y="260" text-anchor="middle">aws_nat_gateway.nat (in public_zone1)</text>
+
+      <!-- Internet to NAT -->
+      <path class="route" d="M 820 84 C 900 84 900 240 420 240" />
+      <polygon class="arrow" points="420,232 420,248 408,240" />
+
+      <line class="route" x1="300" y1="278" x2="300" y2="440" />
+      <polygon class="arrow" points="306,440 300,452 294,440" />
+
+      <!-- ===== PUBLIC half ===== -->
+      <rect class="box public" x="180" y="300" width="330" height="120" />
+      <text class="rt-tag public" x="200" y="330">PUBLIC ROUTE TABLE</text>
+      <text class="lbl sub" x="200" y="346">aws_route_table.public</text>
+      <text class="lbl sub" x="200" y="362">0.0.0.0/0 → Internet Gateway</text>
+      <text class="lbl sub" x="200" y="396">assoc → public_zone1 · public_zone2</text>
+
+      <line class="route" x1="500" y1="350" x2="345" y2="350" />
+      <polygon class="arrow" points="345,344 345,356 333,350" />
+
+      <!-- public subnets -->
+      <rect class="box public" x="660" y="300" width="250" height="66" />
+      <text class="lbl" x="785" y="328" text-anchor="middle">Public Zone 1</text>
+      <text class="cidr" x="785" y="346" text-anchor="middle">10.10.1.0/24 · us-east-1a</text>
+
+      <rect class="box public" x="660" y="374" width="250" height="66" />
+      <text class="lbl" x="785" y="402" text-anchor="middle">Public Zone 2</text>
+      <text class="cidr" x="785" y="420" text-anchor="middle">10.10.2.0/24 · us-east-1b</text>
+
+      <line class="route" x1="510" y1="340" x2="660" y2="333" />
+      <line class="route" x1="510" y1="360" x2="660" y2="407" />
+      <polygon class="arrow" points="660,333 648,340 652,325" />
+      <polygon class="arrow" points="660,407 648,414 652,399" />
+
+      <!-- IGW to public RT -->
+      <line class="route" x1="500" y1="116" x2="500" y2="300" />
+      <polygon class="arrow" points="506,300 500,312 494,300" />
+
+      <text class="lbl" x="740" y="295" fill="#1d4ed8" font-size="11">PUBLIC</text>
+
+      <!-- ===== PRIVATE half ===== -->
+      <rect class="box private" x="180" y="452" width="330" height="120" />
+      <text class="rt-tag private" x="200" y="482">PRIVATE ROUTE TABLE</text>
+      <text class="lbl sub" x="200" y="498">aws_route_table.private</text>
+      <text class="lbl sub" x="200" y="514">0.0.0.0/0 → NAT Gateway</text>
+      <text class="lbl sub" x="200" y="548">assoc → private_zone1 · private_zone2</text>
+
+      <!-- private subnets -->
+      <rect class="box private" x="660" y="452" width="250" height="66" />
+      <text class="lbl" x="785" y="480" text-anchor="middle">Private Zone 1</text>
+      <text class="cidr" x="785" y="498" text-anchor="middle">10.10.11.0/24 · us-east-1a</text>
+
+      <rect class="box private" x="660" y="526" width="250" height="66" />
+      <text class="lbl" x="785" y="554" text-anchor="middle">Private Zone 2</text>
+      <text class="cidr" x="785" y="572" text-anchor="middle">10.10.12.0/24 · us-east-1b</text>
+
+      <line class="route" x1="510" y1="492" x2="660" y2="485" />
+      <line class="route" x1="510" y1="512" x2="660" y2="559" />
+      <polygon class="arrow" points="660,485 648,492 652,477" />
+      <polygon class="arrow" points="660,559 648,566 652,551" />
+
+      <text class="lbl" x="740" y="447" fill="#047857" font-size="11">PRIVATE</text>
+
+      <!-- side labels -->
+      <text class="lbl" x="45" y="360" fill="#1d4ed8" transform="rotate(-90 45 360)" font-size="11">PUBLIC</text>
+      <text class="lbl" x="45" y="600" fill="#047857" transform="rotate(-90 45 600)" font-size="11">PRIVATE</text>
+    </svg>
+  </div>
+
+  <footer>Generated from terraform sources in <code>vpc/</code> · flows shown as routes (dashed)</footer>
+</body>
+</html>
