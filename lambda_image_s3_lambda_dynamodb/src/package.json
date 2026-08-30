@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "init": "npm install --os=linux --cpu=x64"
+    "pkg:init": "npm install --os=linux --cpu=x64"
   },
   "keywords": [],
   "author": "",

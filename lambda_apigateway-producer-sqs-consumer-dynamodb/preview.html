@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orders Pipeline Architecture — floci</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --client: #334155;
+    --entry: #6366f1;
+    --producer: #db2777;
+    --queue: #d97706;
+    --dlq: #b45309;
+    --consumer: #0ea5e9;
+    --db: #10b981;
+    --line: #94a3b8;
+    --flow: #cbd5e1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  svg { width: 100%; height: auto; display: block; }
+  .box {
+    fill: #fff;
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .lbl { font-size: 13px; fill: var(--ink); font-weight: 600; }
+  .lbl.sub { fill: var(--muted); font-weight: 400; font-size: 11px; }
+  .mono { fill: var(--muted); font-size: 10.5px; font-family: ui-monospace, monospace; }
+  .flow { fill: none; stroke: var(--line); stroke-width: 2; marker-end: url(#arrow); }
+  .flow.entry { stroke: var(--entry); }
+  .flow.producer { stroke: var(--producer); }
+  .flow.queue { stroke: var(--queue); }
+  .flow.consumer { stroke: var(--consumer); }
+  .flow.db { stroke: var(--db); }
+  .ftag { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-anchor: middle; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+  <h1>Orders Pipeline — API Gateway → SQS → DynamoDB</h1>
+  <div class="sub">Local floci deployment · environment=local · us-east-1 · terraform</div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--client)"></span> Client</span>
+    <span><span class="dot" style="background:var(--entry)"></span> API Gateway v2</span>
+    <span><span class="dot" style="background:var(--producer)"></span> Producer Lambda</span>
+    <span><span class="dot" style="background:var(--queue)"></span> SQS Queue</span>
+    <span><span class="dot" style="background:var(--consumer)"></span> Consumer Lambda</span>
+    <span><span class="dot" style="background:var(--db)"></span> DynamoDB</span>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+        </marker>
+      </defs>
+
+      <!-- Client -->
+      <rect class="box" x="40" y="150" width="180" height="72" stroke="var(--client)" />
+      <text class="lbl" x="130" y="184" text-anchor="middle">Client</text>
+      <text class="lbl sub" x="130" y="202" text-anchor="middle">POST /orders</text>
+
+      <!-- API Gateway -->
+      <rect class="box" x="300" y="140" width="200" height="92" stroke="var(--entry)" />
+      <text class="lbl" x="400" y="172" text-anchor="middle" fill="#4338ca">API Gateway v2</text>
+      <text class="lbl sub" x="400" y="190" text-anchor="middle">orders-api-local</text>
+      <text class="mono" x="400" y="206" text-anchor="middle">HTTP · $default · AWS_PROXY</text>
+      <text class="mono" x="400" y="220" text-anchor="middle">POST /orders · payload 2.0</text>
+
+      <!-- Producer -->
+      <rect class="box" x="640" y="140" width="220" height="92" stroke="var(--producer)" />
+      <text class="lbl" x="750" y="172" text-anchor="middle" fill="#be185d">OrderProducer</text>
+      <text class="lbl sub" x="750" y="190" text-anchor="middle">Node 22 · index.handler</text>
+      <text class="mono" x="750" y="206" text-anchor="middle">queue_url → main</text>
+      <text class="mono" x="750" y="220" text-anchor="middle">returns HTTP 202 Accepted</text>
+
+      <!-- Client -> API -->
+      <line class="flow entry" x1="220" y1="186" x2="296" y2="186" />
+      <text class="ftag" x="258" y="176" fill="var(--entry)">/orders</text>
+
+      <!-- API -> Producer -->
+      <line class="flow producer" x1="500" y1="186" x2="636" y2="186" />
+      <text class="ftag" x="568" y="176" fill="var(--producer)">invoke</text>
+
+      <!-- Producer -> SQS -->
+      <path class="flow producer" d="M 750 232 C 750 300 750 300 750 340" />
+      <text class="ftag" x="762" y="286" fill="var(--producer)">SendMessage</text>
+
+      <!-- SQS main -->
+      <rect class="box" x="640" y="320" width="220" height="86" stroke="var(--queue)" />
+      <text class="lbl" x="750" y="352" text-anchor="middle" fill="#b45309">SQS Queue</text>
+      <text class="mono" x="750" y="370" text-anchor="middle">orders-order-main-local</text>
+      <text class="mono" x="750" y="386" text-anchor="middle">visibility_timeout = 30s</text>
+
+      <!-- SQS -> DLQ -->
+      <path class="flow" d="M 640 340 C 520 340 520 470 300 470" opacity="0.8" />
+      <rect class="box" x="60" y="430" width="180" height="86" stroke="var(--dlq)" />
+      <text class="lbl" x="150" y="462" text-anchor="middle" fill="#92400e">DLQ</text>
+      <text class="mono" x="150" y="480" text-anchor="middle" fill="#b45309">orders-order-dlq-local</text>
+      <text class="mono" x="150" y="496" text-anchor="middle">maxReceiveCount = 3</text>
+      <text class="ftag" x="250" y="452" fill="var(--dlq)">redrive</text>
+
+      <!-- SQS -> Consumer -->
+      <path class="flow consumer" d="M 750 406 C 750 460 750 460 750 500" />
+      <text class="ftag" x="762" y="450" fill="var(--consumer)">event source mapping</text>
+      <text class="ftag" x="762" y="464" fill="var(--muted)">batch_size = 5</text>
+
+      <!-- Consumer -->
+      <rect class="box" x="640" y="480" width="220" height="92" stroke="var(--consumer)" />
+      <text class="lbl" x="750" y="512" text-anchor="middle" fill="#0284c7">OrderConsumer</text>
+      <text class="lbl sub" x="750" y="530" text-anchor="middle">Node 22 · index.handler</text>
+      <text class="mono" x="750" y="546" text-anchor="middle">table → orders-local</text>
+      <text class="mono" x="750" y="560" text-anchor="middle">status = "PROCESSED"</text>
+
+      <!-- Consumer -> DynamoDB -->
+      <path class="flow db" d="M 640 526 C 500 526 500 660 330 660" />
+      <text class="ftag" x="496" y="516" fill="var(--db)">PutItem</text>
+
+      <!-- DynamoDB -->
+      <rect class="box" x="170" y="620" width="240" height="86" stroke="var(--db)" />
+      <text class="lbl" x="290" y="652" text-anchor="middle" fill="#047857">DynamoDB</text>
+      <text class="mono" x="290" y="670" text-anchor="middle">orders-local</text>
+      <text class="mono" x="290" y="686" text-anchor="middle">hash key orderId (S)</text>
+      <text class="mono" x="290" y="700" text-anchor="middle">PAY_PER_REQUEST</text>
+
+      <!-- Layer labels -->
+      <rect class="box" x="40" y="60" width="860" height="38" fill="#f8fafc" stroke="#e2e8f0" />
+      <text class="lbl sub" x="60" y="86" fill="#475569">ASYNC RETURN</text>
+      <text class="lbl sub" x="470" y="86" text-anchor="middle" fill="#94a3b8">fast path (HTTP 202) ── decouples request from work</text>
+      <text class="lbl sub" x="880" y="86" text-anchor="end" fill="#475569">BACKGROUND WORK</text>
+    </svg>
+  </div>
+
+  <footer>Generated from Terraform sources in <code>infrasturcture/</code> · local floci deployment · see <a href="./README.md">README.md</a></footer>
+</body>
+</html>
