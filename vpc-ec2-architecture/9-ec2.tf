@@ -85,4 +85,8 @@ resource "aws_instance" "public-ec2" {
 output "public-ec2" {
   value = aws_instance.private-ec2[*].id
 }
+output "public-ec2-ips" {
+  value = aws_instance.public-ec2[*].public_ip
+
+}
 
